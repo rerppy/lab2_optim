@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 typedef struct
 {
@@ -169,92 +170,81 @@ int collectUni(const Puzzle* p, char* letters) {
     return cnt;
 }
 
-int find_letter_index(char letter, const char letters[], int count) {
-    for (int i = 0; i < count; i++) {
-        if (letters[i] == letter)
-            return i;
-    }
+long long wordToNumber(const char* word, const int letterToDigit[26]) {
+    if (word == NULL)
+        return -1;
 
-    return -1;
-}
-
-long long wordToNumber(const char* word, const char letters[], 
-    const int assignedDigits[], int letterCnt) {
     long long value = 0;
 
     for (int i = 0; word[i] != '\0'; i++) {
-        int index = find_letter_index(word[i], letters, letterCnt);
+		int digit = letterToDigit[word[i] - 'A'];
 
-        if (index == -1)
-            return -1;
+		if (digit == -1)
+			return -1;
 
-        if (assignedDigits[index] == -1)
-            return -1;
-
-        value = value * 10 + assignedDigits[index];
+        value = value * 10 + digit;
     }
 
     return value;
 }
 
-int has_zero_start(const Puzzle* p, const char letters[],
-    const int assignedDigits[], int letterCnt) {
+int has_zero_start(const Puzzle* p, const int letterToDigit[26]) {
     for (int i = 0; i < p->termCount; i++) {
-        int index = find_letter_index(p->terms[i][0], letters, letterCnt);
+        int index = p->terms[i][0] - 'A';
 
-        if (assignedDigits[index] == 0)
+        if (letterToDigit[index] == 0)
             return 1;
     }
 
-    int index = find_letter_index(p->result[0], letters, letterCnt);
+	int index = p->result[0] - 'A';
 
-    if (assignedDigits[index] == 0)
+    if (letterToDigit[index] == 0)
         return 1;
 
     return 0;
 }
 
-int checkSolution(const Puzzle* p, const char letters[], 
-    const int assignedDigits[], int letterCnt) {
-    if (has_zero_start(p, letters, assignedDigits, letterCnt))
+int checkSolution(const Puzzle* p, const int letterToDigit[26]) {
+    if (has_zero_start(p, letterToDigit))
         return 0;
 
     long long sum = 0;
 
     for (int i = 0; i < p->termCount; i++) 
-        sum += wordToNumber(p->terms[i], letters, assignedDigits, letterCnt);
+        sum += wordToNumber(p->terms[i], letterToDigit);
 
-    long long result = wordToNumber(p->result, letters, assignedDigits, letterCnt);
+    long long result = wordToNumber(p->result, letterToDigit);
 
     return sum == result;
 }
 
 int solve_recursive(const Puzzle* p, const char letters[], int letterCnt, int position, 
-    int assignedDigits[], int digitUsed[]) {
+    int letterToDigit[], int digitUsed[]) {
     if (position == letterCnt)
-        return checkSolution(p, letters, assignedDigits, letterCnt);
+        return checkSolution(p, letterToDigit);
+
+    int index = letters[position] - 'A';
 
     for (int digit = 0; digit <= 9; digit++) {
         if (digitUsed[digit])
             continue;
 
-        assignedDigits[position] = digit;
+        letterToDigit[index] = digit;
         digitUsed[digit] = 1;
 
-        if (solve_recursive(p, letters, letterCnt, position + 1, assignedDigits, digitUsed))
+        if (solve_recursive(p, letters, letterCnt, position + 1, letterToDigit, digitUsed))
             return 1;
 
-        assignedDigits[position] = -1;
+        letterToDigit[index] = -1;
         digitUsed[digit] = 0;
     }
 
     return 0;
 }
 
-void printSolution(const Puzzle* p, const char letters[], const int assignedDigits[], 
-    int letterCnt) {
+void printSolution(const Puzzle* p, const int letterToDigit[26]) {
     for (int i = 0; i < p->termCount; i++) {
-        printf("%lld", wordToNumber(p->terms[i], letters, assignedDigits, letterCnt));
+        printf("%lld", wordToNumber(p->terms[i], letterToDigit));
 
         if (i != p->termCount - 1)
             printf(" + ");
@@ -262,7 +252,7 @@ void printSolution(const Puzzle* p, const char letters[], const int assignedDigi
 
     printf(" = ");
 
-    printf("%lld\n", wordToNumber(p->result, letters, assignedDigits, letterCnt));
+    printf("%lld\n", wordToNumber(p->result, letterToDigit));
 }
 
 void solvePuzzle(const char* puzzle) {
@@ -282,21 +272,21 @@ void solvePuzzle(const char* puzzle) {
         return;
     }
 
-    int assignedDigits[26];
+    int letterToDigit[26];
     int digitUsed[10];
 
     for (int i = 0; i < 26; i++)
-        assignedDigits[i] = -1;
+        letterToDigit[i] = -1;
 
     for (int i = 0; i < 10; i++)
         digitUsed[i] = 0;
 
-    int solved = solve_recursive(p, letters, letterCnt, 0, assignedDigits, digitUsed);
+    int solved = solve_recursive(p, letters, letterCnt, 0, letterToDigit, digitUsed);
 
     if (solved) {
         printf("%s\n\n", puzzle);
 
-        printSolution(p, letters, assignedDigits, letterCnt);
+        printSolution(p, letterToDigit);
 
         printf("\n");
     }
@@ -352,7 +342,14 @@ int main(void) {
                 return 1;
             }
 
+            clock_t start = clock();
+
             readPuzzlesFromFile(filename);
+
+            clock_t end = clock();
+
+            printf("Total processing time: %.6f seconds\n",
+                (double)(end - start) / CLOCKS_PER_SEC);
 
             free(filename);
             break;
