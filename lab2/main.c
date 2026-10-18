@@ -200,35 +200,22 @@ int checkSolution(const Puzzle* p, const int letterToDigit[26]) {
 }
 
 int solve_recursive(const Puzzle* p, const char letters[], int letterCnt, int position, 
-    int letterToDigit[], int digitUsed[]) {
+    int letterToDigit[], int digitUsed[], const int isLeading[26]) {
     if (position == letterCnt)
         return checkSolution(p, letterToDigit);
 
     int index = letters[position] - 'A';
 
-    int is_lead_letter = 0;
+    int start = isLeading[index] ? 1 : 0;
 
-    for (int i = 0; i < p->termCount; i++) {
-        if (p->terms[i][0] == letters[position]) {
-            is_lead_letter = 1;
-            break;
-        }
-    }
-
-    if (p->result[0] == letters[position])
-        is_lead_letter = 1;
-
-    for (int digit = 0; digit <= 9; digit++) {
+    for (int digit = start; digit <= 9; digit++) {
         if (digitUsed[digit])
-            continue;
-
-        if (is_lead_letter && digit == 0)
             continue;
 
         letterToDigit[index] = digit;
         digitUsed[digit] = 1;
 
-        if (solve_recursive(p, letters, letterCnt, position + 1, letterToDigit, digitUsed))
+        if (solve_recursive(p, letters, letterCnt, position + 1, letterToDigit, digitUsed, isLeading))
             return 1;
 
         letterToDigit[index] = -1;
@@ -269,15 +256,18 @@ void solvePuzzle(const char* puzzle) {
     }
 
     int letterToDigit[26];
-    int digitUsed[10];
+    int digitUsed[10] = { 0 };
+    int isLeading[26] = { 0 };
 
     for (int i = 0; i < 26; i++)
         letterToDigit[i] = -1;
 
-    for (int i = 0; i < 10; i++)
-        digitUsed[i] = 0;
+    for (int i = 0; i < p->termCount; i++)
+        isLeading[p->terms[i][0] - 'A'] = 1;
 
-    int solved = solve_recursive(p, letters, letterCnt, 0, letterToDigit, digitUsed);
+    isLeading[p->result[0] - 'A'] = 1;
+
+    int solved = solve_recursive(p, letters, letterCnt, 0, letterToDigit, digitUsed, isLeading);
 
     if (solved) {
         printf("%s\n\n", puzzle);
