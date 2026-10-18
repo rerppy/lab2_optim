@@ -188,26 +188,7 @@ long long wordToNumber(const char* word, const int letterToDigit[26]) {
     return value;
 }
 
-int has_zero_start(const Puzzle* p, const int letterToDigit[26]) {
-    for (int i = 0; i < p->termCount; i++) {
-        int index = p->terms[i][0] - 'A';
-
-        if (letterToDigit[index] == 0)
-            return 1;
-    }
-
-	int index = p->result[0] - 'A';
-
-    if (letterToDigit[index] == 0)
-        return 1;
-
-    return 0;
-}
-
 int checkSolution(const Puzzle* p, const int letterToDigit[26]) {
-    if (has_zero_start(p, letterToDigit))
-        return 0;
-
     long long sum = 0;
 
     for (int i = 0; i < p->termCount; i++) 
@@ -225,8 +206,23 @@ int solve_recursive(const Puzzle* p, const char letters[], int letterCnt, int po
 
     int index = letters[position] - 'A';
 
+    int is_lead_letter = 0;
+
+    for (int i = 0; i < p->termCount; i++) {
+        if (p->terms[i][0] == letters[position]) {
+            is_lead_letter = 1;
+            break;
+        }
+    }
+
+    if (p->result[0] == letters[position])
+        is_lead_letter = 1;
+
     for (int digit = 0; digit <= 9; digit++) {
         if (digitUsed[digit])
+            continue;
+
+        if (is_lead_letter && digit == 0)
             continue;
 
         letterToDigit[index] = digit;
