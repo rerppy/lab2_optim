@@ -118,53 +118,29 @@ Puzzle* parsePuzzle(const char* puzzle) {
     return p;
 }
 
-int collectUni(const Puzzle* p, char* letters) {
-    if (p == NULL || letters == NULL)
-        return 0;
+static int addLetter(char c, char* letters, int cnt) {
+    for (int k = 0; k < cnt; k++)
+        if (letters[k] == c)
+            return cnt;
 
+    letters[cnt] = c;
+    return cnt + 1;
+}
+
+int collect_by_columns(const Puzzle* p, char* letters, int cols_need[]) {
+    int resLen = (int)strlen(p->result);
     int cnt = 0;
 
-    for (int i = 0; i < p->termCount; i++) {
-        const char* word = p->terms[i];
-
-        for (int j = 0; word[j] != '\0'; j++) {
-            char c = word[j];
-            int was = 0;
-
-            for (int k = 0; k < cnt; k++) {
-                if (letters[k] == c) {
-                    was = 1;
-                    break;
-                }
-            }
-
-            if (!was) {
-                letters[cnt++] = c;
-            }
+    for (int col = 0; col < resLen; col++) {
+        for (int i = 0; i < p->termCount; i++) {
+            int len = (int)strlen(p->terms[i]);
+            if (col < len)
+                cnt = addLetter(p->terms[i][len - 1 - col], letters, cnt);
         }
-    }
 
-    if (p->result != NULL) {
-        const char* word = p->result;
+        cnt = addLetter(p->result[resLen - 1 - col], letters, cnt);
 
-        for (int j = 0; word[j] != '\0'; j++) {
-            char c = word[j];
-            int was = 0;
-
-            for (int k = 0; k < cnt; k++)
-            {
-                if (letters[k] == c)
-                {
-                    was = 1;
-                    break;
-                }
-            }
-
-            if (!was)
-            {
-                letters[cnt++] = c;
-            }
-        }
+        cols_need[col] = cnt;
     }
 
     return cnt;
@@ -199,8 +175,41 @@ int checkSolution(const Puzzle* p, const int letterToDigit[26]) {
     return sum == result;
 }
 
+long long lastDigits(const char* word, const int letterToDigit[26], int cols) {
+    int len = (int)strlen(word);
+    int start = len > cols ? len - cols : 0;
+    long long v = 0;
+
+    for (int i = start; i < len; i++)
+        v = v * 10 + letterToDigit[word[i] - 'A'];
+
+    return v;
+}
+
+int columnsOk(const Puzzle* p, const int letterToDigit[26],
+    const int colsNeed[], int resLen, int assigned) {
+    int cols = 0;
+
+    while (cols < resLen && colsNeed[cols] <= assigned)
+        cols++;
+
+    if (cols == 0 || colsNeed[cols - 1] != assigned)
+        return 1;
+
+    long long mod = 1;
+    for (int i = 0; i < cols; i++)
+        mod *= 10;
+
+    long long sum = 0;
+    for (int i = 0; i < p->termCount; i++)
+        sum += lastDigits(p->terms[i], letterToDigit, cols);
+
+    return sum % mod == lastDigits(p->result, letterToDigit, cols);
+}
+
 int solve_recursive(const Puzzle* p, const char letters[], int letterCnt, int position, 
-    int letterToDigit[], int digitUsed[], const int isLeading[26]) {
+    int letterToDigit[], int digitUsed[], const int isLeading[26], 
+    const int colsNeed[], int resLen) {
     if (position == letterCnt)
         return checkSolution(p, letterToDigit);
 
@@ -215,7 +224,9 @@ int solve_recursive(const Puzzle* p, const char letters[], int letterCnt, int po
         letterToDigit[index] = digit;
         digitUsed[digit] = 1;
 
-        if (solve_recursive(p, letters, letterCnt, position + 1, letterToDigit, digitUsed, isLeading))
+        if (columnsOk(p, letterToDigit, colsNeed, resLen, position + 1) &&
+            solve_recursive(p, letters, letterCnt, position + 1, letterToDigit, digitUsed,
+                isLeading, colsNeed, resLen))
             return 1;
 
         letterToDigit[index] = -1;
@@ -246,8 +257,26 @@ void solvePuzzle(const char* puzzle) {
         return;
     }
 
+    size_t resLen = strlen(p->result);
+
+    for (int i = 0; i < p->termCount; i++) {
+        if (strlen(p->terms[i]) > resLen) {
+            printf("%s\n\nNo solution\n\n", puzzle);
+            freePuzzle(p);
+            return;
+        }
+    }
+
     char letters[26];
-    int letterCnt = collectUni(p, letters);
+    int* colsNeed = malloc(resLen * sizeof(int));
+
+    if (colsNeed == NULL) {
+        printf("Memory allocation error\n");
+        freePuzzle(p);
+        return;
+    }
+
+    int letterCnt = collect_by_columns(p, letters, colsNeed);
 
     if (letterCnt > 10) {
         printf("Too many unique letters\n");
@@ -267,7 +296,7 @@ void solvePuzzle(const char* puzzle) {
 
     isLeading[p->result[0] - 'A'] = 1;
 
-    int solved = solve_recursive(p, letters, letterCnt, 0, letterToDigit, digitUsed, isLeading);
+    int solved = solve_recursive(p, letters, letterCnt, 0, letterToDigit, digitUsed, isLeading, colsNeed, resLen);
 
     if (solved) {
         printf("%s\n\n", puzzle);
@@ -277,8 +306,9 @@ void solvePuzzle(const char* puzzle) {
         printf("\n");
     }
     else
-        printf("Internal error\n");
+        printf("No solution\n");
 
+    free(colsNeed);
     freePuzzle(p);
 }
 
