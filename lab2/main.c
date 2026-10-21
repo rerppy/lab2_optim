@@ -209,7 +209,7 @@ int columnsOk(const Puzzle* p, const int letterToDigit[26],
 
 int solve_recursive(const Puzzle* p, const char letters[], int letterCnt, int position, 
     int letterToDigit[], int digitUsed[], const int isLeading[26], 
-    const int colsNeed[], int resLen) {
+    const int colsNeed[], int resLen, const int max_digit[26]) {
     if (position == letterCnt)
         return checkSolution(p, letterToDigit);
 
@@ -217,7 +217,7 @@ int solve_recursive(const Puzzle* p, const char letters[], int letterCnt, int po
 
     int start = isLeading[index] ? 1 : 0;
 
-    for (int digit = start; digit <= 9; digit++) {
+    for (int digit = start; digit <= max_digit[index]; digit++) {
         if (digitUsed[digit])
             continue;
 
@@ -226,7 +226,7 @@ int solve_recursive(const Puzzle* p, const char letters[], int letterCnt, int po
 
         if (columnsOk(p, letterToDigit, colsNeed, resLen, position + 1) &&
             solve_recursive(p, letters, letterCnt, position + 1, letterToDigit, digitUsed,
-                isLeading, colsNeed, resLen))
+                isLeading, colsNeed, resLen, max_digit))
             return 1;
 
         letterToDigit[index] = -1;
@@ -257,10 +257,16 @@ void solvePuzzle(const char* puzzle) {
         return;
     }
 
-    size_t resLen = strlen(p->result);
+    int resLen = (int)strlen(p->result);
+    int max_term_len = 0;
 
     for (int i = 0; i < p->termCount; i++) {
-        if (strlen(p->terms[i]) > resLen) {
+        int len = (int)strlen(p->terms[i]);
+
+        if (len > max_term_len)
+            max_term_len = len;
+
+        if (len > resLen) {
             printf("%s\n\nNo solution\n\n", puzzle);
             freePuzzle(p);
             return;
@@ -296,7 +302,14 @@ void solvePuzzle(const char* puzzle) {
 
     isLeading[p->result[0] - 'A'] = 1;
 
-    int solved = solve_recursive(p, letters, letterCnt, 0, letterToDigit, digitUsed, isLeading, colsNeed, resLen);
+    int max_digit[26];
+    for (int i = 0; i < 26; i++)
+        max_digit[i] = 9;
+
+    if (resLen == max_term_len + 1)
+        max_digit[p->result[0] - 'A'] = p->termCount - 1;
+
+    int solved = solve_recursive(p, letters, letterCnt, 0, letterToDigit, digitUsed, isLeading, colsNeed, resLen, max_digit);
 
     if (solved) {
         printf("%s\n\n", puzzle);
